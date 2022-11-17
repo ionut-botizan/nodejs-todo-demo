@@ -2,6 +2,9 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const { MongoClient, ObjectId } = require('mongodb')
 
+const fs = require('node:fs/promises')
+const path = require('node:path')
+
 const { MONGO_USER = '', MONGO_PASS = '', MONGO_HOST = 'localhost', MONGO_PORT = '27017' } = process.env
 const MONGO_URL = `mongodb://${MONGO_USER}:${MONGO_PASS}@${MONGO_HOST}:${MONGO_PORT}`
 
@@ -9,8 +12,8 @@ const APP_PORT = process.env.PORT || 4000
 const app = express()
 
 app.use(bodyParser.json({ extended: true }))
-app.use(express.static('dist'))
-app.use(express.static('public'))
+app.use(express.static('dist/client', { index: false }))
+app.use(express.static('public', { index: false }))
 
 app.post('/api/create-task', async (req, res) => {
 	const task = req.body
@@ -54,6 +57,20 @@ app.get('/api/tasks', async (req, res) => {
 	const completed = await getCompletedTasks()
 
 	res.json({ active, completed })
+})
+
+app.use('*', async (req, res, next) => {
+	const url = req.originalUrl
+	const [active, completed] = await Promise.all([getActiveTasks(), getCompletedTasks()])
+	const initialData = { active, completed }
+
+	const template = await fs.readFile(path.resolve(__dirname, '../dist/client/index.html'), 'utf-8')
+	const render = (await import('../dist/server/entry-server.mjs')).render
+
+	const appHtml = render(url, initialData)
+	const html = template.replace('<!--ssr-html-->', appHtml)
+
+	res.status(200).set({ 'Content-Type': 'text/html' }).end(html)
 })
 
 app.listen(APP_PORT, () => {
