@@ -4,9 +4,11 @@
 	"description": "A simple to do list app ",
 	"main": "server/app.js",
 	"scripts": {
-		"start:server": "nodemon -r dotenv/config server/app.js",
-		"start:client": "vite",
-		"build": "vite build",
+		"start": "node -r dotenv/config server/app.js",
+		"dev": "nodemon -r dotenv/config server/app.js",
+		"build": "npm run build:client && npm run build:server",
+		"build:client": "vite build --outDir dist/client",
+		"build:server": "vite build --outDir dist/server --ssr client/entry-server.jsx",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"engines": {

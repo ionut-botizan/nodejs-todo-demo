@@ -24,15 +24,15 @@ A Node.js application that let's you add and complete tasks on a single page, st
   ```bash
   docker compose -f ./docker/docker-compose.yml --project-directory . up
   ```
-- Start the server using `npm run start:server`
-- Start the client using `npm run start:client`
-- Navigate to `http://localhost:3000/` to view the app in dev mode, with hot HMR enabled
+- Start the app in watch mode by setting the `NODE_ENV` variable to anything other than `production` then run `npm run dev`
+- Navigate to `http://localhost:4000/` to view the app in dev mode, with hot HMR enabled
 
 ---
 
 ## Build the app
 
 - Perform the setup as above
+- Set the `NODE_ENV` variable to `production` (in your environment or in the `.env` file)
 - Build the React app using `npm run build`
-- Start the server using `npm run start:server`
+- Start the server using `npm run start`
 - Navigate to `http://localhost:4000/` to view the production version of the React app, served by Express
