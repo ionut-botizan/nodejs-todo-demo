@@ -2,7 +2,7 @@
 	"name": "nodejs-todo",
 	"version": "1.0.0",
 	"description": "A simple to do list app ",
-	"main": "app.js",
+	"main": "server/app.js",
 	"scripts": {
 		"start:server": "nodemon -r dotenv/config server/app.js",
 		"start:client": "vite",
@@ -30,7 +30,7 @@
 	},
 	"nodemonConfig": {
 		"watch": [
-			"app.js",
+			"server/**/*",
 			".env"
 		]
 	},
