@@ -8,15 +8,15 @@ const MONGO_URL = `mongodb://${MONGO_USER}:${MONGO_PASS}@${MONGO_HOST}:${MONGO_P
 const APP_PORT = process.env.PORT || 4000
 const app = express()
 
-app.use(bodyParser.urlencoded({ extended: true }))
-app.set('view engine', 'ejs')
+app.use(bodyParser.json({ extended: true }))
+app.use(express.static('dist'))
 app.use(express.static('public'))
 
-app.post('/create-task', async (req, res) => {
+app.post('/api/create-task', async (req, res) => {
 	const task = req.body
 
 	if (!task.title) {
-		return res.redirect('/')
+		return res.status(400).json({})
 	}
 
 	const { client, todos } = await getMongoClient()
@@ -24,14 +24,14 @@ app.post('/create-task', async (req, res) => {
 
 	await client.close()
 
-	res.redirect('/')
+	res.json(result)
 })
 
-app.post('/complete-task', async (req, res) => {
+app.post('/api/complete-task', async (req, res) => {
 	const taskId = req.body.id
 
 	if (!taskId) {
-		return res.redirect('/')
+		return res.status(400).json({})
 	}
 
 	const { client, todos } = await getMongoClient()
@@ -46,14 +46,14 @@ app.post('/complete-task', async (req, res) => {
 
 	await client.close()
 
-	res.redirect('/')
+	res.json(result)
 })
 
-app.get('/', async (req, res) => {
+app.get('/api/tasks', async (req, res) => {
 	const active = await getActiveTasks()
 	const completed = await getCompletedTasks()
 
-	res.render('index', { active, completed })
+	res.json({ active, completed })
 })
 
 app.listen(APP_PORT, () => {
@@ -70,7 +70,7 @@ async function getMongoClient() {
 async function getActiveTasks() {
 	const operations = [
 		{
-			$limit: 10,
+			$limit: 100,
 		},
 		{
 			$match: {
@@ -93,7 +93,7 @@ async function getActiveTasks() {
 async function getCompletedTasks() {
 	const operations = [
 		{
-			$limit: 10,
+			$limit: 100,
 		},
 		{
 			$match: {
@@ -102,7 +102,6 @@ async function getCompletedTasks() {
 		},
 		{
 			$project: {
-				_id: 0,
 				status: 0,
 			},
 		},
