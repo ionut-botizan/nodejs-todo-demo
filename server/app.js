@@ -81,7 +81,9 @@ async function createExpressServer() {
 		const { template, render } = await getSSRDependencies(vite, url)
 
 		const appHtml = render(url, initialData)
-		const html = template.replace('<!--ssr-html-->', appHtml)
+		const html = template
+			.replace('<!--ssr-html-->', appHtml)
+			.replace('/*ssr-data*/', `var __SSR_DATA=${JSON.stringify(initialData)}`)
 
 		res.status(200).set({ 'Content-Type': 'text/html' }).end(html)
 	})
