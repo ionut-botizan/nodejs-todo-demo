@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import './styles.css'
 
-export default function App() {
-	const [active, setActive] = useState([])
-	const [completed, setCompleted] = useState([])
+export default function App({ data }) {
+	const [active, setActive] = useState(data?.active ?? [])
+	const [completed, setCompleted] = useState(data?.completed ?? [])
 
 	const loadTasks = useCallback(async () => {
 		const response = await fetch('/api/tasks')
