@@ -4,78 +4,109 @@ const { MongoClient, ObjectId } = require('mongodb')
 
 const fs = require('node:fs/promises')
 const path = require('node:path')
+const { createServer: createViteServer } = require('vite')
 
 const { MONGO_USER = '', MONGO_PASS = '', MONGO_HOST = 'localhost', MONGO_PORT = '27017' } = process.env
 const MONGO_URL = `mongodb://${MONGO_USER}:${MONGO_PASS}@${MONGO_HOST}:${MONGO_PORT}`
 
 const APP_PORT = process.env.PORT || 4000
-const app = express()
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
-app.use(bodyParser.json({ extended: true }))
-app.use(express.static('dist/client', { index: false }))
-app.use(express.static('public', { index: false }))
+async function createExpressServer() {
+	let vite
+	const app = express()
 
-app.post('/api/create-task', async (req, res) => {
-	const task = req.body
+	if (!IS_PRODUCTION) {
+		vite = await createViteServer({
+			server: { middlewareMode: true },
+			appType: 'custom',
+		})
 
-	if (!task.title) {
-		return res.status(400).json({})
+		app.use(vite.middlewares)
 	}
 
-	const { client, todos } = await getMongoClient()
-	const result = await todos.insertOne(task)
+	app.use(bodyParser.json({ extended: true }))
+	app.use(express.static('dist/client', { index: false }))
+	app.use(express.static('public', { index: false }))
 
-	await client.close()
+	app.post('/api/create-task', async (req, res) => {
+		const task = req.body
 
-	res.json(result)
-})
-
-app.post('/api/complete-task', async (req, res) => {
-	const taskId = req.body.id
-
-	if (!taskId) {
-		return res.status(400).json({})
-	}
-
-	const { client, todos } = await getMongoClient()
-	const result = await todos.updateOne(
-		{ _id: new ObjectId(taskId) },
-		{
-			$set: {
-				status: 'COMPLETED',
-			},
+		if (!task.title) {
+			return res.status(400).json({})
 		}
-	)
 
-	await client.close()
+		const { client, todos } = await getMongoClient()
+		const result = await todos.insertOne(task)
 
-	res.json(result)
-})
+		await client.close()
 
-app.get('/api/tasks', async (req, res) => {
-	const active = await getActiveTasks()
-	const completed = await getCompletedTasks()
+		res.json(result)
+	})
 
-	res.json({ active, completed })
-})
+	app.post('/api/complete-task', async (req, res) => {
+		const taskId = req.body.id
 
-app.use('*', async (req, res, next) => {
-	const url = req.originalUrl
-	const [active, completed] = await Promise.all([getActiveTasks(), getCompletedTasks()])
-	const initialData = { active, completed }
+		if (!taskId) {
+			return res.status(400).json({})
+		}
 
-	const template = await fs.readFile(path.resolve(__dirname, '../dist/client/index.html'), 'utf-8')
-	const render = (await import('../dist/server/entry-server.mjs')).render
+		const { client, todos } = await getMongoClient()
+		const result = await todos.updateOne(
+			{ _id: new ObjectId(taskId) },
+			{
+				$set: {
+					status: 'COMPLETED',
+				},
+			}
+		)
 
-	const appHtml = render(url, initialData)
-	const html = template.replace('<!--ssr-html-->', appHtml)
+		await client.close()
 
-	res.status(200).set({ 'Content-Type': 'text/html' }).end(html)
-})
+		res.json(result)
+	})
 
-app.listen(APP_PORT, () => {
-	console.log('The server is running on port: ', APP_PORT)
-})
+	app.get('/api/tasks', async (req, res) => {
+		const active = await getActiveTasks()
+		const completed = await getCompletedTasks()
+
+		res.json({ active, completed })
+	})
+
+	app.use('*', async (req, res, next) => {
+		const url = req.originalUrl
+		const [active, completed] = await Promise.all([getActiveTasks(), getCompletedTasks()])
+		const initialData = { active, completed }
+
+		const { template, render } = await getSSRDependencies(vite, url)
+
+		const appHtml = render(url, initialData)
+		const html = template.replace('<!--ssr-html-->', appHtml)
+
+		res.status(200).set({ 'Content-Type': 'text/html' }).end(html)
+	})
+
+	app.listen(APP_PORT, () => {
+		console.log('The server is running on port: ', APP_PORT)
+	})
+}
+
+createExpressServer()
+
+async function getSSRDependencies(vite, url) {
+	let template, render
+
+	if (IS_PRODUCTION) {
+		template = await fs.readFile(path.resolve(__dirname, '../dist/client/index.html'), 'utf-8')
+		render = (await import('../dist/server/entry-server.mjs')).render
+	} else {
+		const templateFile = await fs.readFile(path.resolve(__dirname, '../index.html'), 'utf-8')
+		template = await vite.transformIndexHtml(url, templateFile)
+		render = (await vite.ssrLoadModule('/client/entry-server.jsx')).render
+	}
+
+	return { template, render }
+}
 
 async function getMongoClient() {
 	const client = await MongoClient.connect(MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true })
